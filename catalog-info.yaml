@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "sample-nodejs-api"
+  description: "Sample NodeJS API created by backstage"
+  annotations:
+    github.com/project-slug: oun/sample-nodejs-api
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: "group:default/guests"
