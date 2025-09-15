@@ -5,17 +5,20 @@ on:
     branches: [ "main" ]
     tags: [ "v*" ]
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
   IMAGE_NAME: ${{ github.repository }}
+  CHART_DIR: charts/nodejs-api
+  PACKAGE_DIR: .helm-packages
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout
@@ -61,3 +64,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
+  helm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Helm lint
+        run: helm lint "${CHART_DIR}"
+
+      - name: Build chart dependencies (if any)
+        run: helm dependency build "${CHART_DIR}"
+
+      - name: Package chart
+        run: |
+          mkdir -p "${PACKAGE_DIR}"
+          helm package "${CHART_DIR}" --destination "${PACKAGE_DIR}"
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+          helm registry login ${{ env.REGISTRY }} \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Push chart to GHCR
+        run: |
+          for pkg in ${PACKAGE_DIR}/*.tgz; do
+            echo "Pushing $pkg"
+            helm push "$pkg" "oci://${{ env.REGISTRY }}/${{ env.OWNER }}"
+          done
